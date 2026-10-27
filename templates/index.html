@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ site.seo_title }}</title>
+<meta name="description" content="{{ site.seo_description }}">
+<link rel="canonical" href="{{ canonical }}">
+<link rel="icon" href="{{ site.favicon_url }}">
+<meta name="theme-color" content="#5A1D2C">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="{{ site.site_name }}">
+<meta property="og:title" content="{{ site.seo_title }}">
+<meta property="og:description" content="{{ site.seo_description }}">
+<meta property="og:url" content="{{ canonical }}">
+{% if site.og_url %}<meta property="og:image" content="{{ site.og_url }}">{% endif %}
+<meta name="twitter:card" content="{{ 'summary_large_image' if site.og_url else 'summary' }}">
+{% if site.og_url %}<meta name="twitter:image" content="{{ site.og_url }}">{% endif %}
+<script type="application/ld+json">{{ ld|tojson }}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=Newsreader:ital,opsz,wght@0,6..72,400;1,6..72,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="top">
+  <a class="brand" href="#top">{{ site.site_name }}</a>
+  <nav aria-label="Main">
+    {% if gallery %}<a href="#work">Work</a>{% endif %}
+    {% if services %}<a href="#services">Services</a>{% endif %}
+    <a href="#about">About</a>
+    <a href="#quote">Get a quote</a>
+  </nav>
+</header>
+
+<main id="main">
+<section class="hero" id="top">
+  <img src="{{ hero_image }}" alt="{{ hero_alt }}">
+  <div class="hero-copy">
+    <h1>{{ site.hero_title }}</h1>
+    <div class="hero-side">
+      <p>{{ site.hero_text }}</p>
+      <a class="btn" href="#quote">Get a quote</a>
+    </div>
+  </div>
+</section>
+
+<section class="sec statement">
+  <h2>{{ site.statement_title }}</h2>
+  <p>{{ site.statement_text }}</p>
+</section>
+
+{% if gallery %}
+<section class="sec work" id="work" aria-label="Recent work">
+  <div class="grid">
+    {% for p in gallery %}
+    <figure class="ph {% if p.layout == 'wide' %}ph-wide{% elif p.layout == 'tall' %}ph-tall{% endif %}">
+      <img src="{{ url_for('uploaded', filename=p.filename) }}" alt="{{ p.alt or p.caption or '' }}" loading="lazy">
+      {% if p.caption %}<figcaption>{{ p.caption }}</figcaption>{% endif %}
+    </figure>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% if services %}
+<section class="sec services" id="services">
+  <div class="services-wrap">
+    <h2>What I cook for</h2>
+    <div>
+      {% for s in services %}
+      <div class="svc"><h3>{{ s.title }}</h3><p>{{ s.description }}</p></div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<section class="sec about" id="about">
+  {% if gallery %}<img src="{{ url_for('uploaded', filename=gallery[-1].filename) }}" alt="{{ gallery[-1].alt or '' }}" loading="lazy">{% endif %}
+  <div>
+    <h2>{{ site.about_title }}</h2>
+    <p>{{ site.about_text }}</p>
+    <p class="where">{{ site.about_location }}</p>
+  </div>
+</section>
+
+{% if testimonials %}
+<section class="sec words" aria-label="Kind words">
+  {% for t in testimonials %}
+  <blockquote>{{ t.quote }}<cite>{{ t.client }}{% if t.role %}, {{ t.role }}{% endif %}</cite></blockquote>
+  {% endfor %}
+</section>
+{% endif %}
+
+<section class="sec quote" id="quote">
+  <div>
+    <h2>{{ site.quote_title }}</h2>
+    <p>{{ site.quote_text }}</p>
+    <ul class="contact">
+      {% if site.email %}<li><a href="mailto:{{ site.email }}">{{ site.email }}</a></li>{% endif %}
+      {% if site.phone %}<li><a href="tel:{{ site.phone|replace(' ','') }}">{{ site.phone }}</a></li>{% endif %}
+      {% if site.wa_url %}<li><a href="{{ site.wa_url }}">WhatsApp</a></li>{% endif %}
+    </ul>
+    {% if site.availability %}<p class="avail">{{ site.availability }}</p>{% endif %}
+    {% if site.hours %}<p class="hours">{{ site.hours }}</p>{% endif %}
+    {% if site.show_map == '1' %}<iframe class="map" title="Map of {{ site.location }}" loading="lazy" src="{{ site.map_embed }}" referrerpolicy="no-referrer-when-downgrade"></iframe>
+    {% elif site.location %}<p><a href="{{ site.map_url }}" rel="noopener">{{ site.location }} on Google Maps</a></p>{% endif %}
+  </div>
+  <form class="enquiry" action="{{ url_for('submit_quote') }}" method="post">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label>Your name<input name="name" autocomplete="name" required></label>
+    <label>Email<input type="email" name="email" autocomplete="email" required></label>
+    <label>Event date<input type="date" name="date"></label>
+    <label>Number of guests<input name="guests" inputmode="numeric"></label>
+    <label class="full">Occasion
+      <select name="occasion">
+        <option value="">Choose one</option>
+        {% for o in occasions %}<option>{{ o.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="full">Tell me about the day<textarea name="message"></textarea></label>
+    <label class="hp" aria-hidden="true">Leave this empty<input name="company_website" tabindex="-1" autocomplete="off"></label>
+    <button class="btn" type="submit">Send request</button>
+  </form>
+</section>
+</main>
+
+<footer>
+  <span>&copy; {{ site.chef_name }}. {{ site.location }}</span>
+  <span>
+    {% if site.instagram_url %}<a href="{{ site.instagram_url }}" rel="noopener">Instagram</a>{% endif %}
+    {% if site.facebook_url %}&nbsp; <a href="{{ site.facebook_url }}" rel="noopener">Facebook</a>{% endif %}
+  </span>
+</footer>
+{% if site.wa_url %}<a class="wa" href="{{ site.wa_url }}" rel="noopener" aria-label="Chat on WhatsApp">WhatsApp</a>{% endif %}
+</body>
+</html>

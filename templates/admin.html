@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="csrf" content="{{ csrf_token() }}">
+<title>Dashboard — {{ site.site_name }}</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}">
+<script src="{{ url_for('static', filename='admin.js') }}" defer></script>
+</head>
+<body class="admin">
+{% macro f(key,label,area=false,wide=false) %}
+<label class="{{ 'wide' if wide }}">{{ label }}
+{% if area %}<textarea name="{{ key }}">{{ site[key] }}</textarea>{% else %}<input name="{{ key }}" value="{{ site[key] }}">{% endif %}</label>
+{% endmacro %}
+{% macro layouts(sel) %}
+<select name="layout">{% for v in ['normal','wide','tall'] %}<option value="{{ v }}" {{ 'selected' if sel==v }}>{{ v|capitalize }}</option>{% endfor %}</select>
+{% endmacro %}
+
+<header class="bar">
+  <strong>{{ site.site_name }} dashboard</strong>
+  <nav>
+    <a href="#quotes">Quote requests</a><a href="#photos">Photos</a><a href="#services">Services</a>
+    <a href="#words">Testimonials</a><a href="#occasions">Occasions</a><a href="#settings">Website text</a>
+    <a href="{{ url_for('index') }}" target="_blank" rel="noopener">View website</a>
+    <a href="#branding">Branding</a><a href="#system">Backup</a><a href="{{ url_for('password_page') }}">Password</a>
+    <form method="post" action="{{ url_for('logout') }}" style="display:inline">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="linklike" type="submit">Log out</button></form>
+  </nav>
+</header>
+
+<div class="wrap">
+{% if message %}<p class="msg" role="status">{{ message }}</p>{% endif %}
+<div class="counts">
+  <div><b>{{ counts.new_quotes }}</b>New requests</div>
+  <div><b>{{ counts.quotes }}</b>All requests</div>
+  <div><b>{{ counts.photos }}</b>Photos</div>
+  <div><b>{{ counts.services }}</b>Services</div>
+  <div><b>{{ counts.testimonials }}</b>Testimonials</div>
+</div>
+
+<section class="panel" id="quotes"><h2>Quote requests</h2>
+{% for q in quotes %}
+<div class="q">
+  <p><strong>{{ q.name }}</strong> <span class="tag {{ q.status }}">{{ q.status }}</span>
+     <span class="hint">{{ q.created_at }}</span></p>
+  <p>{{ q.occasion or 'No occasion given' }}{% if q.event_date %} on {{ q.event_date }}{% endif %}{% if q.guests %}, {{ q.guests }} guests{% endif %}</p>
+  {% if q.message %}<p>{{ q.message }}</p>{% endif %}
+  <div class="row">
+    <a class="btn dark" href="mailto:{{ q.email }}?subject=Your%20enquiry%20to%20{{ site.chef_name|urlencode }}">Email {{ q.email }}</a>
+    <form method="post" action="{{ url_for('update_quote_status', item_id=q.id) }}" class="row" style="margin:0">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <select name="status" aria-label="Status" style="width:auto">{% for s in ['New','Contacted','Closed'] %}<option {{ 'selected' if q.status==s }}>{{ s }}</option>{% endfor %}</select>
+      <button class="btn" type="submit">Update status</button>
+    </form>
+    <form method="post" action="{{ url_for('delete_quote', item_id=q.id) }}" data-confirm="Delete this request?" style="margin:0">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn danger" type="submit">Delete</button></form>
+  </div>
+</div>
+{% else %}<p class="hint">No requests yet. They will appear here when someone uses the form on your website.</p>{% endfor %}
+</section>
+
+<section class="panel" id="branding"><h2>Branding and sharing</h2>
+<p class="hint">Hero image: the large photo at the top of the homepage. Sharing image: the preview shown on WhatsApp, Facebook and Google (1200 &times; 630 works best). Favicon: the small icon in the browser tab (square PNG). Without a favicon, one is made from your website name.</p>
+{% for kind, label, key in [('hero','Hero image','hero_file'),('og','Sharing image','og_file'),('favicon','Favicon','favicon_file')] %}
+<div class="row" style="justify-content:space-between;border-top:1px solid #e1e0d9;padding-top:1rem">
+  <strong>{{ label }}</strong>
+  <form method="post" action="{{ url_for('set_asset', kind=kind) }}" enctype="multipart/form-data" class="row" style="margin:0">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="file" name="image" accept=".jpg,.jpeg,.png,.webp" required style="width:auto">
+    <button class="btn dark" type="submit">{{ 'Replace' if site[key] else 'Upload' }}</button>
+  </form>
+  {% if site[key] %}<form method="post" action="{{ url_for('delete_asset', kind=kind) }}" data-confirm="Remove this image?" style="margin:0">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn danger" type="submit">Remove</button></form>{% endif %}
+</div>
+{% endfor %}
+</section>
+
+<section class="panel" id="photos"><h2>Photos</h2>
+<p class="hint">Drag the handle (or use the arrows) to reorder. JPG, PNG or WEBP, up to 12 MB. Without a dedicated hero image under Branding, the first photo is the hero.</p>
+<form method="post" action="{{ url_for('upload') }}" enctype="multipart/form-data">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="fields">
+    <label>Photo<input type="file" name="photo" accept=".jpg,.jpeg,.png,.webp" required></label>
+    <label>Caption<input name="caption"></label>
+    <label>Describe the photo (alt text)<input name="alt"></label>
+    <label>Layout{{ layouts('normal') }}</label>
+  </div>
+  <div class="row"><button class="btn dark" type="submit">Upload photo</button></div>
+</form>
+<div id="photo-list" data-url="{{ url_for('reorder_photos') }}">
+{% for p in photos %}
+<details data-id="{{ p.id }}"><summary><span class="grip" title="Drag to reorder">&#8942;&#8942;</span><span class="mv"><button type="button" data-mv="-1" aria-label="Move up">&#9650;</button><button type="button" data-mv="1" aria-label="Move down">&#9660;</button></span><img src="{{ url_for('uploaded', filename=p.filename) }}" alt="">{{ p.caption or p.filename }}</summary>
+  <form method="post" action="{{ url_for('edit_photo', item_id=p.id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="fields">
+      <label>Caption<input name="caption" value="{{ p.caption or '' }}"></label>
+      <label>Alt text<input name="alt" value="{{ p.alt or '' }}"></label>
+      <label>Layout{{ layouts(p.layout) }}</label>
+    </div>
+    <div class="row"><button class="btn dark" type="submit">Save photo</button></div>
+  </form>
+  <form method="post" action="{{ url_for('delete_photo', item_id=p.id) }}" data-confirm="Delete this photo?">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn danger" type="submit">Delete photo</button></form>
+</details>
+{% endfor %}
+</div>
+<p id="order-status" class="hint" role="status"></p>
+</section>
+
+<section class="panel" id="services"><h2>Services</h2>
+<form method="post" action="{{ url_for('add_service') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="fields">
+    <label>Title<input name="title" required></label>
+    <label>Order<input type="number" name="sort_order" value="0"></label>
+    <label class="wide">Description<textarea name="description"></textarea></label>
+  </div>
+  <div class="row"><button class="btn dark" type="submit">Add service</button></div>
+</form>
+{% for s in services %}
+<details><summary>{{ s.title }}</summary>
+  <form method="post" action="{{ url_for('edit_service', item_id=s.id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="number" value="{{ s.number or '' }}">
+    <div class="fields">
+      <label>Title<input name="title" value="{{ s.title }}" required></label>
+      <label>Order<input type="number" name="sort_order" value="{{ s.sort_order }}"></label>
+      <label class="wide">Description<textarea name="description">{{ s.description }}</textarea></label>
+    </div>
+    <div class="row"><button class="btn dark" type="submit">Save service</button></div>
+  </form>
+  <form method="post" action="{{ url_for('delete_service', item_id=s.id) }}" data-confirm="Delete this service?">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn danger" type="submit">Delete service</button></form>
+</details>
+{% endfor %}
+</section>
+
+<section class="panel" id="words"><h2>Testimonials</h2>
+<form method="post" action="{{ url_for('add_testimonial') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="fields">
+    <label>Client name<input name="client" required></label>
+    <label>Role or event<input name="role"></label>
+    <label>Order<input type="number" name="sort_order" value="0"></label>
+    <label class="wide">Quote<textarea name="quote" required></textarea></label>
+  </div>
+  <div class="row"><button class="btn dark" type="submit">Add testimonial</button></div>
+</form>
+{% for t in testimonials %}
+<details><summary>{{ t.client }}</summary>
+  <form method="post" action="{{ url_for('edit_testimonial', item_id=t.id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="fields">
+      <label>Client name<input name="client" value="{{ t.client }}" required></label>
+      <label>Role or event<input name="role" value="{{ t.role or '' }}"></label>
+      <label>Order<input type="number" name="sort_order" value="{{ t.sort_order }}"></label>
+      <label class="wide">Quote<textarea name="quote" required>{{ t.quote }}</textarea></label>
+    </div>
+    <div class="row"><button class="btn dark" type="submit">Save testimonial</button></div>
+  </form>
+  <form method="post" action="{{ url_for('delete_testimonial', item_id=t.id) }}" data-confirm="Delete this testimonial?">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn danger" type="submit">Delete testimonial</button></form>
+</details>
+{% endfor %}
+</section>
+
+<section class="panel" id="occasions"><h2>Occasions in the quote form</h2>
+<form method="post" action="{{ url_for('add_occasion') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="fields">
+    <label>Name<input name="name" required></label>
+    <label>Order<input type="number" name="sort_order" value="0"></label>
+  </div>
+  <div class="row"><button class="btn dark" type="submit">Add occasion</button></div>
+</form>
+{% for o in occasions %}
+<details><summary>{{ o.name }}{% if not o.active %} <span class="tag">Hidden</span>{% endif %}</summary>
+  <form method="post" action="{{ url_for('edit_occasion', item_id=o.id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="fields">
+      <label>Name<input name="name" value="{{ o.name }}" required></label>
+      <label>Order<input type="number" name="sort_order" value="{{ o.sort_order }}"></label>
+      <label style="grid-auto-flow:column;justify-content:start;align-items:center;gap:.5rem"><input type="checkbox" name="active" {{ 'checked' if o.active }} style="width:auto"> Show in form</label>
+    </div>
+    <div class="row"><button class="btn dark" type="submit">Save occasion</button></div>
+  </form>
+  <form method="post" action="{{ url_for('delete_occasion', item_id=o.id) }}" data-confirm="Delete this occasion?">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn danger" type="submit">Delete occasion</button></form>
+</details>
+{% endfor %}
+</section>
+
+<section class="panel" id="system"><h2>Backup and email</h2>
+<p class="hint">Download a copy of all quote requests, text and photos. Do this before any big change, and keep a copy somewhere other than the server.</p>
+<div class="row"><a class="btn dark" href="{{ url_for('backup') }}">Download backup (.zip)</a></div>
+<p class="hint" style="margin-top:1.4rem">{% if mail_ready %}Email is set up. New quote requests are sent to {{ site.notify_email or site.email }}.{% else %}Email is not set up yet. Add the SMTP details on your server so quote requests reach your inbox (see DEPLOY.md).{% endif %}</p>
+<form method="post" action="{{ url_for('test_email') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn" type="submit">Send a test email</button></form>
+</section>
+
+<section class="panel" id="settings"><h2>Website text and contact details</h2>
+<form method="post" action="{{ url_for('update_settings') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="fields">
+    {{ f('site_name','Website name') }}{{ f('chef_name','Chef name') }}{{ f('location','Location') }}
+    {{ f('email','Email') }}{{ f('phone','Phone') }}{{ f('whatsapp','WhatsApp number (with country code)') }}
+    {{ f('instagram','Instagram link') }}{{ f('facebook','Facebook link') }}
+    {{ f('hero_title','Homepage heading',wide=true) }}{{ f('hero_text','Homepage intro',true,true) }}
+    {{ f('statement_title','Statement heading',wide=true) }}{{ f('statement_text','Statement text',true,true) }}
+    {{ f('about_title','About heading',wide=true) }}{{ f('about_text','About text',true,true) }}{{ f('about_location','About location line',wide=true) }}
+    {{ f('quote_title','Quote form heading',wide=true) }}{{ f('quote_text','Quote form text',true,true) }}
+    {{ f('availability','Availability note (for example: Booking from March)',wide=true) }}{{ f('hours','Business hours (one line per day)',true,true) }}{{ f('notify_email','Send quote alerts to (leave empty to use the email above)') }}
+    <label style="grid-auto-flow:column;justify-content:start;align-items:center;gap:.5rem"><input type="checkbox" name="show_map" value="1" {{ 'checked' if site.show_map=='1' }} style="width:auto"> Show a Google map of the location</label>
+    {{ f('seo_title','Browser tab and Google title',wide=true) }}{{ f('seo_description','Google description',true,true) }}
+  </div>
+  <div class="row"><button class="btn dark" type="submit">Save website text</button></div>
+</form>
+</section>
+</div>
+</body></html>

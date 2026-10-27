@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="{{ site.favicon_url }}">
+<title>Owner login</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;600&family=Newsreader:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}"></head>
+<body><main class="solo">
+<h1>Owner login</h1>
+{% if error %}<p class="err" role="alert">{{ error }}</p>{% endif %}
+<form class="stack" method="post">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <label>Username<input name="username" autocomplete="username" required></label>
+  <label>Password<input type="password" name="password" autocomplete="current-password" required></label>
+  <button class="btn dark" type="submit">Log in</button>
+</form>
+</main></body></html>

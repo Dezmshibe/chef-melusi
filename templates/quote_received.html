@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ 'Check your details' if error else 'Request received' }} — {{ site.site_name }}</title>
+<link rel="icon" href="{{ site.favicon_url }}">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600&family=Newsreader:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"></head>
+<body><main class="solo">
+{% if error %}<h1>Check your details.</h1><p>{{ error }}</p>
+<p><a class="btn" style="background:var(--ink);color:var(--stone)" href="{{ url_for('index') }}#quote">Back to the form</a></p>
+{% else %}<h1>Request received.</h1>
+<p>Thank you. {{ site.chef_name }} will read your details and reply by email with a tailored quote.</p>
+<p><a class="btn" style="background:var(--ink);color:var(--stone)" href="{{ url_for('index') }}">Back to the website</a></p>{% endif %}
+</main></body></html>
