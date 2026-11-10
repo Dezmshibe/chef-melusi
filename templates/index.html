@@ -27,10 +27,11 @@
 <header class="top">
   <a class="brand" href="#top">{{ site.site_name }}</a>
   <nav aria-label="Main">
-    {% if gallery %}<a href="#work">Work</a>{% endif %}
-    {% if services %}<a href="#services">Services</a>{% endif %}
-    <a href="#about">About</a>
-    <a href="#quote">Get a quote</a>
+    {% if gallery %}<a href="#work">{{ site.nav_work }}</a>{% endif %}
+    {% if services %}<a href="#services">{{ site.nav_services }}</a>{% endif %}
+    {% if pricing %}<a href="#pricing">{{ site.pricing_nav_label or "Pricing" }}</a>{% endif %}
+    <a href="#about">{{ site.nav_about }}</a>
+    <a href="#quote">{{ site.nav_quote }}</a>
   </nav>
 </header>
 
@@ -41,7 +42,7 @@
     <h1>{{ site.hero_title }}</h1>
     <div class="hero-side">
       <p>{{ site.hero_text }}</p>
-      <a class="btn" href="#quote">Get a quote</a>
+      <a class="btn" href="#quote">{{ site.nav_quote }}</a>
     </div>
   </div>
 </section>
@@ -67,10 +68,28 @@
 {% if services %}
 <section class="sec services" id="services">
   <div class="services-wrap">
-    <h2>What I cook for</h2>
+    <h2>{{ site.services_title }}</h2>
     <div>
       {% for s in services %}
       <div class="svc"><h3>{{ s.title }}</h3><p>{{ s.description }}</p></div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{% if pricing %}
+<section class="sec services pricing" id="pricing">
+  <div class="services-wrap">
+    <h2>{{ site.pricing_title }}</h2>
+    {% if site.pricing_text %}<p>{{ site.pricing_text }}</p>{% endif %}
+    <div>
+      {% for p in pricing %}
+      <div class="svc">
+        <h3>{{ p.title }}</h3>
+        {% if p.description %}<p>{{ p.description }}</p>{% endif %}
+        <p class="price">{{ p.currency }} {{ p.amount }} <small>{{ p.price_unit }}</small></p>
+      </div>
       {% endfor %}
     </div>
   </div>
@@ -110,25 +129,25 @@
   </div>
   <form class="enquiry" action="{{ url_for('submit_quote') }}" method="post">
 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <label>Your name<input name="name" autocomplete="name" required></label>
-    <label>Email<input type="email" name="email" autocomplete="email" required></label>
-    <label>Event date<input type="date" name="date"></label>
-    <label>Number of guests<input name="guests" inputmode="numeric"></label>
-    <label class="full">Occasion
+    <label>{{ site.quote_name_label }}<input name="name" autocomplete="name" required></label>
+    <label>{{ site.quote_email_label }}<input type="email" name="email" autocomplete="email" required></label>
+    <label>{{ site.quote_date_label }}<input type="date" name="date"></label>
+    <label>{{ site.quote_guests_label }}<input name="guests" inputmode="numeric"></label>
+    <label class="full">{{ site.quote_occasion_label }}
       <select name="occasion">
         <option value="">Choose one</option>
         {% for o in occasions %}<option>{{ o.name }}</option>{% endfor %}
       </select>
     </label>
-    <label class="full">Tell me about the day<textarea name="message"></textarea></label>
+    <label class="full">{{ site.quote_message_label }}<textarea name="message"></textarea></label>
     <label class="hp" aria-hidden="true">Leave this empty<input name="company_website" tabindex="-1" autocomplete="off"></label>
-    <button class="btn" type="submit">Send request</button>
+    <button class="btn" type="submit">{{ site.quote_button }}</button>
   </form>
 </section>
 </main>
 
 <footer>
-  <span>&copy; {{ site.chef_name }}. {{ site.location }}</span>
+  <span>{{ site.footer_text or ('© ' ~ site.chef_name ~ '. ' ~ site.location) }}</span>
   <span>
     {% if site.instagram_url %}<a href="{{ site.instagram_url }}" rel="noopener">Instagram</a>{% endif %}
     {% if site.facebook_url %}&nbsp; <a href="{{ site.facebook_url }}" rel="noopener">Facebook</a>{% endif %}

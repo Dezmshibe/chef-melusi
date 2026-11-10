@@ -19,7 +19,7 @@
   <strong>{{ site.site_name }} dashboard</strong>
   <nav>
     <a href="#quotes">Quote requests</a><a href="#photos">Photos</a><a href="#services">Services</a>
-    <a href="#words">Testimonials</a><a href="#occasions">Occasions</a><a href="#settings">Website text</a>
+    <a href="#words">Testimonials</a><a href="#pricing">Pricing</a><a href="#occasions">Occasions</a><a href="#settings">Website text</a>
     <a href="{{ url_for('index') }}" target="_blank" rel="noopener">View website</a>
     <a href="#branding">Branding</a><a href="#system">Backup</a><a href="{{ url_for('password_page') }}">Password</a>
     <form method="post" action="{{ url_for('logout') }}" style="display:inline">
@@ -34,7 +34,7 @@
   <div><b>{{ counts.quotes }}</b>All requests</div>
   <div><b>{{ counts.photos }}</b>Photos</div>
   <div><b>{{ counts.services }}</b>Services</div>
-  <div><b>{{ counts.testimonials }}</b>Testimonials</div>
+  <div><b>{{ counts.testimonials }}</b>Testimonials</div><div><b>{{ counts.pricing }}</b>Prices</div>
 </div>
 
 <section class="panel" id="quotes"><h2>Quote requests</h2>
@@ -49,7 +49,8 @@
     <form method="post" action="{{ url_for('update_quote_status', item_id=q.id) }}" class="row" style="margin:0">
 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <select name="status" aria-label="Status" style="width:auto">{% for s in ['New','Contacted','Closed'] %}<option {{ 'selected' if q.status==s }}>{{ s }}</option>{% endfor %}</select>
-      <button class="btn" type="submit">Update status</button>
+      <label>Quoted price (ZAR)<input name="quoted_price" type="number" min="0" step="0.01" value="{{ q.quoted_price or '' }}" placeholder="Set quote price" style="width:150px"></label>
+      <button class="btn" type="submit">Save quote</button>
     </form>
     <form method="post" action="{{ url_for('delete_quote', item_id=q.id) }}" data-confirm="Delete this request?" style="margin:0">
 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn danger" type="submit">Delete</button></form>
@@ -134,6 +135,38 @@
 {% endfor %}
 </section>
 
+<section class="panel" id="pricing"><h2>Pricing</h2>
+<p class="hint">Add starting prices or package prices. These are displayed publicly on the website. Use 0 only when you intentionally want a free item.</p>
+<form method="post" action="{{ url_for('add_pricing') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<div class="fields">
+<label>Price / package name<input name="title" required></label>
+<label>Amount (numbers only)<input name="amount" type="number" min="0" step="0.01" required></label>
+<label>Currency code<input name="currency" value="ZAR" maxlength="3" required></label>
+<label>Price unit<input name="price_unit" value="per person" placeholder="per person / per event"></label>
+<label>Display order<input name="sort_order" type="number" value="0"></label>
+<label class="wide">Description<textarea name="description"></textarea></label>
+</div><div class="row"><button class="btn dark" type="submit">Add price</button></div>
+</form>
+{% for p in pricing %}
+<details><summary>{{ p.title }} — {{ p.currency }} {{ p.amount }}{% if not p.active %} <span class="tag">Hidden</span>{% endif %}</summary>
+<form method="post" action="{{ url_for('edit_pricing', item_id=p.id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<div class="fields">
+<label>Price / package name<input name="title" value="{{ p.title }}" required></label>
+<label>Amount<input name="amount" type="number" min="0" step="0.01" value="{{ p.amount }}" required></label>
+<label>Currency code<input name="currency" maxlength="3" value="{{ p.currency }}" required></label>
+<label>Price unit<input name="price_unit" value="{{ p.price_unit }}"></label>
+<label>Display order<input name="sort_order" type="number" value="{{ p.sort_order }}"></label>
+<label class="wide">Description<textarea name="description">{{ p.description or '' }}</textarea></label>
+<label style="grid-auto-flow:column;justify-content:start;align-items:center;gap:.5rem"><input type="checkbox" name="active" {{ 'checked' if p.active }} style="width:auto"> Show on website</label>
+</div><div class="row"><button class="btn dark" type="submit">Save price</button></div>
+</form>
+<form method="post" action="{{ url_for('delete_pricing', item_id=p.id) }}" data-confirm="Delete this price?"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn danger" type="submit">Delete price</button></form>
+</details>
+{% else %}<p class="hint">No pricing has been published yet.</p>{% endfor %}
+</section>
+
 <section class="panel" id="words"><h2>Testimonials</h2>
 <form method="post" action="{{ url_for('add_testimonial') }}">
 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -204,9 +237,16 @@
     {{ f('site_name','Website name') }}{{ f('chef_name','Chef name') }}{{ f('location','Location') }}
     {{ f('email','Email') }}{{ f('phone','Phone') }}{{ f('whatsapp','WhatsApp number (with country code)') }}
     {{ f('instagram','Instagram link') }}{{ f('facebook','Facebook link') }}
+    {{ f('nav_work','Navigation: Work') }}{{ f('nav_services','Navigation: Services') }}{{ f('nav_about','Navigation: About') }}{{ f('nav_quote','Navigation: Quote') }}{{ f('pricing_nav_label','Navigation: Pricing') }}
     {{ f('hero_title','Homepage heading',wide=true) }}{{ f('hero_text','Homepage intro',true,true) }}
     {{ f('statement_title','Statement heading',wide=true) }}{{ f('statement_text','Statement text',true,true) }}
     {{ f('about_title','About heading',wide=true) }}{{ f('about_text','About text',true,true) }}{{ f('about_location','About location line',wide=true) }}
+    {{ f('services_title','Services section heading',wide=true) }}
+    {{ f('pricing_title','Pricing section heading',wide=true) }}{{ f('pricing_text','Pricing introduction',true,true) }}
+    {{ f('quote_button','Quote submit button label') }}{{ f('quote_name_label','Quote form: name label') }}{{ f('quote_email_label','Quote form: email label') }}
+    {{ f('quote_date_label','Quote form: date label') }}{{ f('quote_guests_label','Quote form: guests label') }}
+    {{ f('quote_occasion_label','Quote form: occasion label') }}{{ f('quote_message_label','Quote form: message label') }}
+    {{ f('footer_text','Footer text (leave empty for automatic)',wide=true) }}
     {{ f('quote_title','Quote form heading',wide=true) }}{{ f('quote_text','Quote form text',true,true) }}
     {{ f('availability','Availability note (for example: Booking from March)',wide=true) }}{{ f('hours','Business hours (one line per day)',true,true) }}{{ f('notify_email','Send quote alerts to (leave empty to use the email above)') }}
     <label style="grid-auto-flow:column;justify-content:start;align-items:center;gap:.5rem"><input type="checkbox" name="show_map" value="1" {{ 'checked' if site.show_map=='1' }} style="width:auto"> Show a Google map of the location</label>

@@ -10,6 +10,7 @@ venv/
 env/
 
 # Environment / secrets
+.secret_key
 .env
 .env.*
 !.env.example

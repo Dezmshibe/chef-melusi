@@ -80,6 +80,13 @@ DEFAULT_SETTINGS = {
     "seo_title": "Chef Amara — Private Chef",
     "seo_description": "Private chef experiences, celebrations and events in Johannesburg.",
     "hours": "", "availability": "", "notify_email": "", "show_map": "0",
+    "nav_work": "Work", "nav_services": "Services", "nav_about": "About", "nav_quote": "Get a quote", "pricing_nav_label": "Pricing",
+    "services_title": "What I cook for", "pricing_title": "A considered experience, clearly priced.",
+    "pricing_text": "Starting prices are guides. Every event receives a tailored quote.",
+    "quote_button": "Send request", "quote_name_label": "Your name", "quote_email_label": "Email",
+    "quote_date_label": "Event date", "quote_guests_label": "Number of guests",
+    "quote_occasion_label": "Occasion", "quote_message_label": "Tell me about the day",
+    "footer_text": "",
     "hero_file": "", "og_file": "", "favicon_file": "",
 }
 
@@ -99,6 +106,7 @@ def init_db():
         c.executescript("""
         CREATE TABLE IF NOT EXISTS photos (id INTEGER PRIMARY KEY AUTOINCREMENT, filename TEXT NOT NULL, caption TEXT, alt TEXT, layout TEXT DEFAULT 'normal', sort_order INTEGER DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
         CREATE TABLE IF NOT EXISTS services (id INTEGER PRIMARY KEY AUTOINCREMENT, number TEXT, title TEXT NOT NULL, description TEXT, sort_order INTEGER DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS pricing (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, description TEXT, amount TEXT NOT NULL DEFAULT '0', currency TEXT NOT NULL DEFAULT 'ZAR', price_unit TEXT DEFAULT 'per person', sort_order INTEGER DEFAULT 0, active INTEGER DEFAULT 1);
         CREATE TABLE IF NOT EXISTS testimonials (id INTEGER PRIMARY KEY AUTOINCREMENT, client TEXT NOT NULL, quote TEXT NOT NULL, role TEXT, sort_order INTEGER DEFAULT 0);
         CREATE TABLE IF NOT EXISTS quotes (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, email TEXT NOT NULL, event_date TEXT, guests TEXT, occasion TEXT, message TEXT, status TEXT DEFAULT 'New', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
         CREATE TABLE IF NOT EXISTS occasions (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, sort_order INTEGER DEFAULT 0, active INTEGER DEFAULT 1);
@@ -107,6 +115,8 @@ def init_db():
         """)
         if "sort_order" not in [r["name"] for r in c.execute("PRAGMA table_info(photos)")]:
             c.execute("ALTER TABLE photos ADD COLUMN sort_order INTEGER DEFAULT 0")
+        if "quoted_price" not in [r["name"] for r in c.execute("PRAGMA table_info(quotes)")]:
+            c.execute("ALTER TABLE quotes ADD COLUMN quoted_price TEXT DEFAULT ''")
         for k, v in DEFAULT_SETTINGS.items():
             c.execute("INSERT OR IGNORE INTO settings(key,value) VALUES(?,?)", (k, v))
         if c.execute("SELECT COUNT(*) FROM occasions").fetchone()[0] == 0:
@@ -129,6 +139,11 @@ def init_db():
                     print(f"\n*** First-run admin login -> username: {user}  password: {pw}  (you must change it) ***\n", flush=True)
             c.execute("INSERT INTO admin_users(username,password_hash,must_change) VALUES(?,?,?)",
                       (user, generate_password_hash(pw), force))
+        owner = c.execute("SELECT value FROM settings WHERE key='owner_admin_id'").fetchone()
+        if not owner:
+            first_owner = c.execute("SELECT id FROM admin_users ORDER BY id LIMIT 1").fetchone()
+            if first_owner:
+                c.execute("INSERT INTO settings(key,value) VALUES('owner_admin_id',?)", (str(first_owner["id"]),))
 
 def get_settings():
     with conn() as c:
@@ -195,6 +210,14 @@ def logged_in(f):
         if not u:
             session.clear()
             return redirect(url_for("login"))
+        # SQLite has no native RLS. Enforce the single-site owner boundary at
+        # the application layer: only the designated owner identity may read
+        # or mutate CMS/customer records.
+        with conn() as c:
+            owner = c.execute("SELECT value FROM settings WHERE key='owner_admin_id'").fetchone()
+        if not owner or str(u["id"]) != str(owner["value"]):
+            session.clear()
+            abort(403)
         g.user = u
         if u["must_change"] and request.endpoint not in ("password_page", "update_password", "logout"):
             return redirect(url_for("password_page"))
@@ -241,32 +264,46 @@ def wa_number(v):
     cc = os.environ.get("DEFAULT_COUNTRY_CODE", "27")
     return cc + d[1:] if d.startswith("0") else d
 
-def send_mail(to, subject, body, reply_to=None):
+def _send_mail_now(to, subject, body, reply_to=None):
+    """Send one message and report the SMTP server's actual result."""
     host = os.environ.get("SMTP_HOST")
     if not host or not to:
         log.warning("Email not sent (SMTP_HOST or recipient missing): %s", subject)
         return False
-    def job():
-        try:
-            port = int(os.environ.get("SMTP_PORT", "587"))
-            user, pw = os.environ.get("SMTP_USER"), os.environ.get("SMTP_PASSWORD")
-            m = EmailMessage()
-            m["Subject"] = re.sub(r"[\r\n]+", " ", subject)
-            m["From"] = os.environ.get("MAIL_FROM") or user or "no-reply@localhost"
-            m["To"] = to
-            if reply_to:
-                m["Reply-To"] = reply_to
-            m.set_content(body)
-            s = smtplib.SMTP_SSL(host, port, timeout=20) if port == 465 else smtplib.SMTP(host, port, timeout=20)
-            with s:
-                if port != 465:
-                    s.starttls()
-                if user:
-                    s.login(user, pw or "")
-                s.send_message(m)
-        except Exception:
-            log.exception("Email failed: %s", subject)
-    threading.Thread(target=job, daemon=True).start()
+    try:
+        port = int(os.environ.get("SMTP_PORT", "587"))
+        user, pw = os.environ.get("SMTP_USER"), os.environ.get("SMTP_PASSWORD")
+        message = EmailMessage()
+        message["Subject"] = re.sub(r"[\\r\\n]+", " ", subject)
+        message["From"] = os.environ.get("MAIL_FROM") or user or "no-reply@localhost"
+        message["To"] = to
+        if reply_to:
+            message["Reply-To"] = reply_to
+        message.set_content(body)
+        smtp = smtplib.SMTP_SSL(host, port, timeout=20) if port == 465 else smtplib.SMTP(host, port, timeout=20)
+        with smtp:
+            if port != 465:
+                smtp.starttls()
+            if user:
+                smtp.login(user, pw or "")
+            smtp.send_message(message)
+        return True
+    except Exception:
+        log.exception("Email failed: %s", subject)
+        return False
+
+
+def send_mail(to, subject, body, reply_to=None):
+    """Queue a notification email without blocking the public quote form."""
+    if not os.environ.get("SMTP_HOST") or not to:
+        log.warning("Email not queued (SMTP_HOST or recipient missing): %s", subject)
+        return False
+    threading.Thread(
+        target=_send_mail_now,
+        args=(to, subject, body),
+        kwargs={"reply_to": reply_to},
+        daemon=True,
+    ).start()
     return True
 
 def build_backup(fileobj):
@@ -325,6 +362,7 @@ def index():
     with conn() as c:
         photos = c.execute("SELECT * FROM photos ORDER BY sort_order,id DESC").fetchall()
         services = c.execute("SELECT * FROM services ORDER BY sort_order,id").fetchall()
+        pricing = c.execute("SELECT * FROM pricing WHERE active=1 ORDER BY sort_order,id").fetchall()
         testimonials = c.execute("SELECT * FROM testimonials ORDER BY sort_order,id").fetchall()
         occasions = c.execute("SELECT * FROM occasions WHERE active=1 ORDER BY sort_order,id").fetchall()
     hero_alt = s["chef_name"] + " at work"
@@ -336,7 +374,7 @@ def index():
     else:
         hero_image = "https://images.unsplash.com/photo-1515003197210-e0cd71810b5f?auto=format&fit=crop&w=1400&q=85"
         gallery = []
-    return render_template("index.html", gallery=gallery, services=services, testimonials=testimonials,
+    return render_template("index.html", gallery=gallery, services=services, pricing=pricing, testimonials=testimonials,
                            occasions=occasions, hero_image=hero_image, hero_alt=hero_alt)
 
 @app.route("/uploads/<path:filename>")
@@ -431,12 +469,13 @@ def admin():
     with conn() as c:
         photos = c.execute("SELECT * FROM photos ORDER BY sort_order,id DESC").fetchall()
         services = c.execute("SELECT * FROM services ORDER BY sort_order,id").fetchall()
+        pricing = c.execute("SELECT * FROM pricing ORDER BY sort_order,id").fetchall()
         testimonials = c.execute("SELECT * FROM testimonials ORDER BY sort_order,id").fetchall()
         quotes = c.execute("SELECT * FROM quotes ORDER BY id DESC").fetchall()
         occasions = c.execute("SELECT * FROM occasions ORDER BY sort_order,id").fetchall()
     counts = {"photos": len(photos), "services": len(services), "testimonials": len(testimonials),
-              "quotes": len(quotes), "new_quotes": sum(1 for q in quotes if q["status"] == "New"), "occasions": len(occasions)}
-    return render_template("admin.html", photos=photos, services=services, testimonials=testimonials,
+              "quotes": len(quotes), "pricing": len(pricing), "new_quotes": sum(1 for q in quotes if q["status"] == "New"), "occasions": len(occasions)}
+    return render_template("admin.html", photos=photos, services=services, pricing=pricing, testimonials=testimonials,
                            occasions=occasions, quotes=quotes, counts=counts, message=request.args.get("message"),
                            mail_ready=bool(os.environ.get("SMTP_HOST")))
 
@@ -543,13 +582,61 @@ crud("service", "services", ["number", "title", "description", "sort_order"], ["
 crud("testimonial", "testimonials", ["client", "quote", "role", "sort_order"], ["client", "quote"], "Testimonial")
 crud("occasion", "occasions", ["name", "sort_order"], ["name"], "Occasion", bools=("active",))
 
+@app.route("/admin/pricing/add", methods=["POST"])
+@logged_in
+def add_pricing():
+    title = request.form.get("title", "").strip()[:160]
+    amount = request.form.get("amount", "").strip()[:32]
+    try:
+        if not title or not amount or float(amount) < 0:
+            raise ValueError
+    except ValueError:
+        return redirect(url_for("admin", message="Enter a price title and a valid non-negative amount."))
+    with conn() as c:
+        c.execute("INSERT INTO pricing(title,description,amount,currency,price_unit,sort_order,active) VALUES(?,?,?,?,?,?,?)",
+                  (title, request.form.get("description","").strip()[:1000], amount,
+                   request.form.get("currency","ZAR")[:3], request.form.get("price_unit","per person")[:60],
+                   to_int(request.form.get("sort_order")), 1))
+    return redirect(url_for("admin", message="Price added."))
+
+@app.route("/admin/pricing/<int:item_id>/edit", methods=["POST"])
+@logged_in
+def edit_pricing(item_id):
+    title = request.form.get("title", "").strip()[:160]
+    amount = request.form.get("amount", "").strip()[:32]
+    try:
+        if not title or not amount or float(amount) < 0:
+            raise ValueError
+    except ValueError:
+        return redirect(url_for("admin", message="Enter a price title and a valid non-negative amount."))
+    with conn() as c:
+        c.execute("UPDATE pricing SET title=?,description=?,amount=?,currency=?,price_unit=?,sort_order=?,active=? WHERE id=?",
+                  (title, request.form.get("description","").strip()[:1000], amount,
+                   request.form.get("currency","ZAR")[:3], request.form.get("price_unit","per person")[:60],
+                   to_int(request.form.get("sort_order")), 1 if request.form.get("active")=="on" else 0, item_id))
+    return redirect(url_for("admin", message="Price updated."))
+
+@app.route("/admin/pricing/<int:item_id>/delete", methods=["POST"])
+@logged_in
+def delete_pricing(item_id):
+    with conn() as c:
+        c.execute("DELETE FROM pricing WHERE id=?", (item_id,))
+    return redirect(url_for("admin", message="Price deleted."))
+
 @app.route("/admin/quote/<int:item_id>/status", methods=["POST"])
 @logged_in
 def update_quote_status(item_id):
     status = request.form.get("status", "New")
+    price = request.form.get("quoted_price", "").strip()[:32]
+    if price:
+        try:
+            if float(price) < 0: raise ValueError
+        except ValueError:
+            return redirect(url_for("admin", message="Enter a valid non-negative quote price."))
     with conn() as c:
-        c.execute("UPDATE quotes SET status=? WHERE id=?", (status if status in {"New", "Contacted", "Closed"} else "New", item_id))
-    return redirect(url_for("admin", message="Quote status updated."))
+        c.execute("UPDATE quotes SET status=?,quoted_price=? WHERE id=?",
+                  (status if status in {"New", "Contacted", "Closed"} else "New", price, item_id))
+    return redirect(url_for("admin", message="Quote status and price saved."))
 
 @app.route("/admin/delete/quote/<int:item_id>", methods=["POST"])
 @logged_in
@@ -571,8 +658,13 @@ def backup():
 def test_email():
     s = get_settings()
     to = s["notify_email"] or s["email"]
-    ok = send_mail(to, "Test email from your website", "Email notifications are working.")
-    return redirect(url_for("admin", message=f"Test email sent to {to}. Check your inbox (and spam)." if ok else "Email is not set up yet: add the SMTP settings on your server."))
+    ok = _send_mail_now(to, "Test email from your website", "Email notifications are working.")
+    message = (
+        f"Your SMTP server accepted the test email for {to}. Check your inbox (and spam)."
+        if ok else
+        "The test email could not be sent. Check the SMTP host, port, username, password and recipient in your hosting settings."
+    )
+    return redirect(url_for("admin", message=message))
 
 init_db()
 _hours = to_int(os.environ.get("AUTO_BACKUP_HOURS", "24" if PROD else "0"))
