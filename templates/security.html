@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Security and audit log</title><link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}"></head>
+<body class="admin"><header class="bar"><strong>Security &amp; audit log</strong><nav><a href="{{ url_for('admin') }}">Dashboard</a><a href="{{ url_for('password_page') }}">Password</a></nav></header>
+<main class="wrap"><section class="panel"><h2>Account security</h2><p>Two-factor authentication: <strong>{{ 'Enabled' if totp_enabled else 'Not enabled' }}</strong></p><p>Unused recovery codes: <strong>{{ recovery_left }}</strong></p>
+{% if request.args.get('error') %}<p class="err">{{ request.args.get('error') }}</p>{% endif %}
+<form method="post" action="{{ url_for('regenerate_recovery_codes') }}" class="stack"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><label>Confirm current password<input type="password" name="current_password" autocomplete="current-password" required></label><button class="btn dark" type="submit">Generate new recovery codes</button></form>
+<p class="hint">Generating new codes invalidates all previously issued recovery codes. Keep the new codes safe.</p></section>
+<section class="panel"><h2>Recent admin activity</h2><p class="hint">Latest 200 security and admin events. Passwords, authenticator secrets and submitted form contents are never written to this log.</p>
+<div style="overflow-x:auto"><table><thead><tr><th>Time</th><th>Event</th><th>IP address</th><th>Details</th></tr></thead><tbody>
+{% for item in logs %}<tr><td>{{ item.created_at }}</td><td>{{ item.event }}</td><td>{{ item.ip_address or '—' }}</td><td>{{ item.details or '' }}</td></tr>{% else %}<tr><td colspan="4">No activity recorded yet.</td></tr>{% endfor %}
+</tbody></table></div></section></main></body></html>

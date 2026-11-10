@@ -123,7 +123,3 @@ footer a{text-underline-offset:.25em}
 .avail{font-weight:600;font-family:var(--display);margin:1.6rem 0 .4rem}
 .hours{white-space:pre-line;color:#d9d6cf;margin:0 0 1rem}
 .map{width:100%;height:14rem;border:0;margin-top:1rem;filter:grayscale(1) contrast(1.05);opacity:.9}
-
-/* Public pricing cards */
-.price { font-family: var(--serif, Georgia, serif); font-size: 1.35rem; margin-top: .8rem; }
-.price small { font-family: inherit; font-size: .8rem; opacity: .72; }

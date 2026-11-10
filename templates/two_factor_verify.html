@@ -1,0 +1,8 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Two-factor verification</title><link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}"></head>
+<body><main class="solo"><h1>Verify it’s you</h1><p>Enter the 6-digit code from your authenticator app, or use one of your one-time recovery codes.</p>
+{% if error %}<p class="err" role="alert">{{ error }}</p>{% endif %}
+<form class="stack" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<label>Authenticator or recovery code<input name="code" autocomplete="one-time-code" inputmode="numeric" autofocus required></label>
+<button class="btn dark" type="submit">Verify and continue</button></form></main></body></html>

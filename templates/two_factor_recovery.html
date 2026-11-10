@@ -1,0 +1,6 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Save recovery codes</title><link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}"></head>
+<body><main class="solo"><h1>Save your recovery codes</h1><p>Store these codes somewhere private, such as a password manager. Each code works once if you cannot access your authenticator. They will not be shown again.</p>
+<section class="panel"><ol>{% for code in recovery_codes %}<li><code>{{ code }}</code></li>{% endfor %}</ol></section>
+<p>After saving them, continue to your dashboard.</p><a class="btn dark" href="{{ url_for('admin') }}">Continue to dashboard</a></main></body></html>
