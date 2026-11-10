@@ -86,13 +86,39 @@
   </div>
 </section>
 
+
 {% if testimonials %}
-<section class="sec words" aria-label="Kind words">
-  {% for t in testimonials %}
-  <blockquote>{{ t.quote }}<cite>{{ t.client }}{% if t.role %}, {{ t.role }}{% endif %}</cite></blockquote>
-  {% endfor %}
+<section class="sec words" id="testimonials" aria-label="Client testimonials">
+  <div class="words-heading">
+    <span class="eyebrow">CLIENT EXPERIENCES</span>
+    <h2>Words from our guests.</h2>
+    <p>Every gathering leaves a memory. Here's what our clients have to say.</p>
+  </div>
+
+  <div class="testimonial-grid">
+    {% for t in testimonials %}
+    <article class="testimonial-card">
+      <div class="testimonial-mark" aria-hidden="true">“</div>
+
+      <blockquote>
+        <p>{{ t.quote }}</p>
+      </blockquote>
+
+      <div class="testimonial-client">
+        <span class="client-line"></span>
+        <div>
+          <cite>{{ t.client }}</cite>
+          {% if t.role %}
+          <span class="client-role">{{ t.role }}</span>
+          {% endif %}
+        </div>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
 </section>
 {% endif %}
+
 
 <section class="sec quote" id="quote">
   <div>
