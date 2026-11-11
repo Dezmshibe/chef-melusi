@@ -1,379 +1,683 @@
-/* Chef site — owner dashboard */
+/* =========================================================
+   CHEF MELUSI — ADMIN DASHBOARD
+   Complete replacement stylesheet.
+   Keeps the existing admin.html structure and form actions.
+   ========================================================= */
 
-body.admin{
-    font:400 1rem/1.5 "Bricolage Grotesque",system-ui,sans-serif;
-    background:#F1F0EB;
-    color:#141C18;
+:root {
+    --admin-bg: #f3f1eb;
+    --admin-surface: #ffffff;
+    --admin-surface-soft: #faf9f6;
+    --admin-ink: #17211c;
+    --admin-muted: #68716b;
+    --admin-line: #e2e0d8;
+    --admin-dark: #17211c;
+    --admin-beet: #642638;
+    --admin-sage: #a8b5a0;
+    --admin-danger: #9c3030;
+    --admin-radius: 14px;
+    --admin-shadow: 0 8px 28px rgba(23, 33, 28, .055);
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 1.5rem;
+}
+
+body.admin {
+    margin: 0;
+    min-width: 320px;
+    background: var(--admin-bg);
+    color: var(--admin-ink);
+    font: 400 15px/1.55 "Bricolage Grotesque", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
 }
 
 .admin h1,
 .admin h2,
-.admin h3{
-    font-family:"Bricolage Grotesque",sans-serif;
-    letter-spacing:-.02em;
+.admin h3,
+.admin p {
+    margin-top: 0;
 }
 
-/* =========================================================
-   ADMIN HEADER
-   Expands normally at the top and becomes compact when
-   the page is scrolled.
-   ========================================================= */
-
-.bar{
-    position:sticky;
-    top:0;
-    z-index:1000;
-
-    display:flex;
-    flex-wrap:wrap;
-    gap:1rem 1.5rem;
-    align-items:center;
-    justify-content:space-between;
-
-    padding:.9rem 1.5rem;
-
-    background:#141C18;
-    color:#E8E7E1;
-
-    border-bottom:1px solid rgba(255,255,255,.08);
-    box-shadow:0 4px 18px rgba(0,0,0,.12);
-
-    transition:
-        padding .25s ease,
-        gap .25s ease,
-        box-shadow .25s ease;
+.admin h1,
+.admin h2,
+.admin h3 {
+    color: var(--admin-ink);
+    font-family: "Bricolage Grotesque", system-ui, sans-serif;
+    letter-spacing: -.035em;
 }
 
-.bar a{
-    color:inherit;
-    text-underline-offset:.25em;
+.admin a {
+    color: inherit;
 }
 
-.bar nav{
-    display:flex;
-    flex-wrap:wrap;
-    gap:1rem;
-    transition:gap .25s ease;
+/* Header: normal document flow, so it never overlays dashboard content. */
+body.admin .bar {
+    position: relative;
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+    width: 100%;
+    padding: 18px clamp(18px, 4vw, 56px) 16px;
+    background: var(--admin-dark);
+    color: #f4f2ec;
+    border-bottom: 3px solid var(--admin-beet);
+    box-shadow: 0 5px 22px rgba(0, 0, 0, .12);
 }
 
-/* Header while scrolling */
-
-.bar.scrolled{
-    padding:.45rem 1rem;
-    gap:.5rem 1rem;
-    box-shadow:0 5px 20px rgba(0,0,0,.24);
+body.admin .bar > strong {
+    display: block;
+    font-size: 1.15rem;
+    font-weight: 600;
+    letter-spacing: -.02em;
 }
 
-.bar.scrolled nav{
-    gap:.7rem;
+body.admin .bar nav {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
 }
 
-.bar.scrolled h1{
-    font-size:1.15rem;
-    margin:0;
-    transition:font-size .25s ease;
+body.admin .bar nav a,
+body.admin .bar nav .linklike {
+    display: inline-flex;
+    align-items: center;
+    min-height: 36px;
+    padding: 7px 11px;
+    border: 1px solid rgba(244, 242, 236, .18);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, .045);
+    color: #f4f2ec;
+    font: 500 .84rem/1.2 "Bricolage Grotesque", system-ui, sans-serif;
+    text-decoration: none;
+    transition: background .18s ease, border-color .18s ease;
 }
 
-/* =========================================================
-   PAGE
-   ========================================================= */
-
-.wrap{
-    max-width:62rem;
-    margin:0 auto;
-    padding:1.5rem;
+body.admin .bar nav a:hover,
+body.admin .bar nav .linklike:hover {
+    background: rgba(255, 255, 255, .13);
+    border-color: rgba(244, 242, 236, .4);
 }
 
-/* =========================================================
-   MESSAGES
-   ========================================================= */
-
-.msg{
-    background:#9FAE98;
-    padding:.8rem 1rem;
-    border-radius:6px;
-    margin-bottom:1.5rem;
+body.admin .bar nav form {
+    display: inline-flex;
+    margin: 0;
 }
 
-/* =========================================================
-   COUNTS
-   ========================================================= */
-
-.counts{
-    display:grid;
-    grid-template-columns:repeat(auto-fit,minmax(8rem,1fr));
-    gap:.8rem;
-    margin-bottom:2rem;
+body.admin .bar nav .linklike {
+    cursor: pointer;
 }
 
-.counts div{
-    background:#fff;
-    border:1px solid #d8d7d0;
-    padding:.9rem 1rem;
-    border-radius:6px;
+/* Main page width and spacing. */
+body.admin .wrap {
+    width: min(100% - 40px, 1440px);
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 30px 0 70px;
 }
 
-.counts b{
-    display:block;
-    font-size:1.8rem;
-    line-height:1;
+/* Status messages. */
+body.admin .msg {
+    margin: 0 0 22px;
+    padding: 13px 16px;
+    border: 1px solid #cbd8c5;
+    border-left: 4px solid #71876b;
+    border-radius: 9px;
+    background: #edf2e9;
+    color: #263c2b;
 }
 
-/* =========================================================
-   PANELS
-   ========================================================= */
-
-.panel{
-    background:#fff;
-    border:1px solid #d8d7d0;
-    border-radius:6px;
-    padding:1.4rem;
-    margin-bottom:1.5rem;
+/* Main six-card dashboard overview.
+   Explicitly target only the first .counts block, not the review counters. */
+body.admin .wrap > .counts {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    width: 100%;
+    margin: 0 0 28px;
+    padding: 0;
 }
 
-.panel>h2{
-    margin:0 0 1rem;
-    font-size:1.5rem;
+body.admin .wrap > .counts > div {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    min-width: 0;
+    min-height: 126px;
+    padding: 20px 22px;
+    border: 1px solid var(--admin-line);
+    border-radius: var(--admin-radius);
+    background: var(--admin-surface);
+    box-shadow: var(--admin-shadow);
+    color: var(--admin-muted);
+    font-size: .94rem;
+    line-height: 1.4;
 }
 
-/* =========================================================
-   FORMS
-   ========================================================= */
-
-.fields{
-    display:grid;
-    grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));
-    gap:1rem;
+body.admin .wrap > .counts > div b {
+    display: block;
+    margin: 0 0 7px;
+    color: var(--admin-ink);
+    font-size: clamp(1.9rem, 3vw, 2.35rem);
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: -.045em;
+    font-variant-numeric: tabular-nums;
 }
 
-.fields .wide{
-    grid-column:1/-1;
+/* Content panels. */
+body.admin .panel {
+    min-width: 0;
+    margin: 0 0 22px;
+    padding: clamp(20px, 2.5vw, 30px);
+    border: 1px solid var(--admin-line);
+    border-radius: var(--admin-radius);
+    background: var(--admin-surface);
+    box-shadow: var(--admin-shadow);
+    scroll-margin-top: 18px;
 }
 
-label{
-    display:grid;
-    gap:.25rem;
-    font-size:.9rem;
-    font-weight:500;
+body.admin .panel > h2 {
+    margin: 0 0 18px;
+    padding-bottom: 13px;
+    border-bottom: 1px solid var(--admin-line);
+    font-size: clamp(1.35rem, 2vw, 1.7rem);
+    line-height: 1.2;
 }
 
-input,
-select,
-textarea{
-    font:inherit;
-    padding:.55rem .65rem;
-    border:1px solid #b9b8b0;
-    border-radius:4px;
-    background:#fff;
-    color:inherit;
-    width:100%;
+body.admin .panel > p.hint {
+    max-width: 80ch;
+    margin: -5px 0 20px;
 }
 
-textarea{
-    min-height:5.5rem;
-    resize:vertical;
+/* Forms and fields. */
+body.admin .panel form {
+    min-width: 0;
 }
 
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible,
-summary:focus-visible{
-    outline:2px solid #5A1D2C;
-    outline-offset:2px;
+body.admin .fields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px 18px;
+    align-items: start;
 }
 
-/* =========================================================
-   BUTTONS
-   ========================================================= */
-
-.btn{
-    font:600 .95rem "Bricolage Grotesque",sans-serif;
-    padding:.6rem 1.1rem;
-    border:0;
-    border-radius:999px;
-    cursor:pointer;
-    background:#E8E7E1;
-    color:#141C18;
-    text-decoration:none;
-    display:inline-block;
+body.admin .fields > label,
+body.admin .panel form > label {
+    display: grid;
+    align-content: start;
+    gap: 7px;
+    min-width: 0;
+    color: #303a34;
+    font-size: .9rem;
+    font-weight: 600;
 }
 
-.btn.dark{
-    background:#141C18;
-    color:#E8E7E1;
+body.admin .fields .wide,
+body.admin .fields > .full {
+    grid-column: 1 / -1;
 }
 
-.btn.danger{
-    background:#fff;
-    color:#8a1c1c;
-    border:1px solid #8a1c1c;
+body.admin input:not([type="checkbox"]):not([type="radio"]),
+body.admin select,
+body.admin textarea {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    margin: 0;
+    padding: 10px 12px;
+    border: 1px solid #d4d2ca;
+    border-radius: 8px;
+    outline: none;
+    background: #fff;
+    color: var(--admin-ink);
+    font: 400 .95rem/1.4 "Bricolage Grotesque", system-ui, sans-serif;
+    box-shadow: inset 0 1px 2px rgba(23, 33, 28, .025);
+    transition: border-color .18s ease, box-shadow .18s ease;
 }
 
-.row{
-    display:flex;
-    flex-wrap:wrap;
-    gap:.6rem;
-    align-items:center;
-    margin-top:1rem;
+body.admin textarea {
+    min-height: 112px;
+    resize: vertical;
 }
 
-/* =========================================================
-   DETAILS / PHOTOS
-   ========================================================= */
-
-details{
-    border-top:1px solid #e1e0d9;
-    padding:.7rem 0;
+body.admin input:focus,
+body.admin select:focus,
+body.admin textarea:focus {
+    border-color: var(--admin-beet);
+    box-shadow: 0 0 0 3px rgba(100, 38, 56, .11);
 }
 
-summary{
-    cursor:pointer;
-    font-weight:600;
-    display:flex;
-    gap:.8rem;
-    align-items:center;
+body.admin input[type="file"] {
+    padding: 8px;
+    background: var(--admin-surface-soft);
 }
 
-summary img{
-    width:3.2rem;
-    height:3.2rem;
-    object-fit:cover;
-    border-radius:4px;
+body.admin input[type="checkbox"],
+body.admin input[type="radio"] {
+    width: 17px !important;
+    height: 17px;
+    min-width: 17px;
+    min-height: 17px;
+    margin: 0;
+    padding: 0;
+    accent-color: var(--admin-beet);
+    cursor: pointer;
 }
 
-details form+form{
-    margin-top:.6rem;
+/* Photo placement and other fieldsets. */
+body.admin fieldset {
+    min-width: 0;
+    margin: 0;
+    padding: 14px 16px;
+    border: 1px solid var(--admin-line);
+    border-radius: 10px;
+    background: var(--admin-surface-soft);
 }
 
-/* =========================================================
-   QUOTE REQUESTS
-   ========================================================= */
-
-.q{
-    border-top:1px solid #e1e0d9;
-    padding:1rem 0;
+body.admin fieldset legend {
+    padding: 0 7px;
+    color: var(--admin-ink);
+    font-size: .88rem;
+    font-weight: 600;
 }
 
-.q p{
-    margin:.3rem 0;
+body.admin fieldset label {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    width: 100%;
+    margin: 0;
+    padding: 6px 0;
+    color: #39443d;
+    font-size: .9rem;
+    line-height: 1.4;
+    cursor: pointer;
 }
 
-.tag{
-    font-size:.8rem;
-    padding:.15rem .6rem;
-    border-radius:999px;
-    background:#E8E7E1;
+body.admin fieldset label input {
+    flex: 0 0 17px;
+    margin-top: 2px;
 }
 
-.tag.New{
-    background:#5A1D2C;
-    color:#fff;
+body.admin .photo-placements {
+    grid-column: 1 / -1;
 }
 
-/* =========================================================
-   HELP / ERRORS
-   ========================================================= */
-
-.hint{
-    color:#59635c;
-    font-size:.9rem;
+/* Buttons and action rows. */
+body.admin .row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 9px;
+    margin-top: 16px;
 }
 
-.err{
-    color:#8a1c1c;
+body.admin .btn {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 40px;
+    padding: 9px 16px;
+    border: 1px solid #d5d3cb;
+    border-radius: 999px;
+    background: #eeede7;
+    color: var(--admin-ink);
+    font: 600 .88rem/1.2 "Bricolage Grotesque", system-ui, sans-serif;
+    text-decoration: none;
+    cursor: pointer;
+    transition: transform .15s ease, background .15s ease, border-color .15s ease;
 }
 
-.stack{
-    display:grid;
-    gap:1rem;
+body.admin .btn:hover {
+    transform: translateY(-1px);
+    background: #e4e2d9;
 }
 
-/* =========================================================
-   V2 ADDITIONS
-   ========================================================= */
-
-.linklike{
-    background:none;
-    border:0;
-    color:inherit;
-    font:inherit;
-    text-decoration:underline;
-    text-underline-offset:.25em;
-    cursor:pointer;
-    padding:0;
+body.admin .btn.dark {
+    border-color: var(--admin-dark);
+    background: var(--admin-dark);
+    color: #f7f5ef;
 }
 
-.grip{
-    cursor:grab;
-    color:#59635c;
-    letter-spacing:-.15em;
-    user-select:none;
-    padding:.3rem .2rem;
+body.admin .btn.dark:hover {
+    background: #2c3b32;
 }
 
-.mv{
-    display:inline-flex;
-    gap:.2rem;
+body.admin .btn.danger {
+    border-color: #e4c5c5;
+    background: #fff8f7;
+    color: var(--admin-danger);
 }
 
-.mv button{
-    font-size:.7rem;
-    border:1px solid #b9b8b0;
-    background:#fff;
-    border-radius:4px;
-    cursor:pointer;
-    padding:.2rem .4rem;
+body.admin .btn.danger:hover {
+    border-color: var(--admin-danger);
+    background: #fff0ee;
 }
 
-details.dragging{
-    opacity:.4;
+/* Expandable records. */
+body.admin details {
+    min-width: 0;
+    margin-top: 12px;
+    padding: 13px 15px;
+    border: 1px solid var(--admin-line);
+    border-radius: 10px;
+    background: var(--admin-surface-soft);
 }
 
-details.over{
-    box-shadow:0 -3px 0 #5A1D2C;
+body.admin details[open] {
+    background: #fff;
 }
 
-/* =========================================================
-   MOBILE
-   ========================================================= */
+body.admin summary {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    min-width: 0;
+    color: var(--admin-ink);
+    font-weight: 600;
+    cursor: pointer;
+    list-style-position: inside;
+}
 
-@media (max-width:700px){
+body.admin summary::marker {
+    color: var(--admin-beet);
+}
 
-    .bar{
-        padding:.8rem 1rem;
-        gap:.7rem;
+body.admin summary img {
+    width: 54px;
+    height: 54px;
+    flex: 0 0 54px;
+    border-radius: 8px;
+    object-fit: cover;
+    background: #e8e7e1;
+}
+
+body.admin details > form {
+    margin-top: 14px;
+}
+
+body.admin details > form + form {
+    margin-top: 10px;
+}
+
+body.admin .grip {
+    color: var(--admin-muted);
+    cursor: grab;
+    user-select: none;
+}
+
+body.admin .mv {
+    display: inline-flex;
+    gap: 4px;
+}
+
+body.admin .mv button {
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--admin-line);
+    border-radius: 6px;
+    background: #fff;
+    color: var(--admin-ink);
+    cursor: pointer;
+}
+
+body.admin details.dragging {
+    opacity: .45;
+}
+
+body.admin details.over {
+    border-color: var(--admin-beet);
+    box-shadow: 0 -3px 0 var(--admin-beet);
+}
+
+/* Quote and testimonial records. */
+body.admin .q {
+    margin: 0;
+    padding: 17px 0;
+    border-top: 1px solid var(--admin-line);
+}
+
+body.admin .q p {
+    margin: 5px 0;
+}
+
+body.admin blockquote {
+    margin: 12px 0;
+    padding: 12px 16px;
+    border-left: 3px solid var(--admin-sage);
+    border-radius: 0 8px 8px 0;
+    background: var(--admin-surface-soft);
+}
+
+body.admin blockquote p {
+    margin: 0;
+}
+
+body.admin .tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 9px;
+    border-radius: 999px;
+    background: #eeede7;
+    color: #48534b;
+    font-size: .76rem;
+    font-weight: 600;
+}
+
+body.admin .tag.New,
+body.admin .tag.Pending {
+    background: #f7e9ed;
+    color: #76283d;
+}
+
+body.admin .tag.Approved {
+    background: #e8f0e5;
+    color: #365b37;
+}
+
+body.admin .tag.Rejected {
+    background: #f8e9e6;
+    color: #8b3029;
+}
+
+/* Testimonial moderation counters, scoped separately from the six overview cards. */
+body.admin #testimonial-reviews .counts {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin: 18px 0;
+}
+
+body.admin #testimonial-reviews .counts > div {
+    min-width: 0;
+    padding: 13px 15px;
+    border: 1px solid var(--admin-line);
+    border-radius: 10px;
+    background: var(--admin-surface-soft);
+    color: var(--admin-muted);
+}
+
+body.admin #testimonial-reviews .counts b {
+    display: block;
+    margin-bottom: 3px;
+    color: var(--admin-ink);
+    font-size: 1.5rem;
+    line-height: 1.1;
+}
+
+/* Utility text and keyboard focus. */
+body.admin .hint {
+    color: var(--admin-muted);
+    font-size: .88rem;
+}
+
+body.admin .err {
+    color: var(--admin-danger);
+}
+
+body.admin .stack {
+    display: grid;
+    gap: 16px;
+}
+
+body.admin .linklike {
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+}
+
+body.admin :focus-visible {
+    outline: 2px solid var(--admin-beet);
+    outline-offset: 3px;
+}
+
+/* Owner login page shares admin.css. */
+body:not(.admin) .solo {
+    display: grid;
+    align-content: center;
+    width: min(100% - 36px, 480px);
+    min-height: 100svh;
+    margin: 0 auto;
+    padding: 40px 0;
+}
+
+body:not(.admin) .solo h1 {
+    margin: 0 0 22px;
+    color: var(--admin-ink);
+    font: 600 clamp(2rem, 6vw, 3.2rem)/1.05 "Bricolage Grotesque", system-ui, sans-serif;
+    letter-spacing: -.04em;
+}
+
+body:not(.admin) .solo .stack {
+    display: grid;
+    gap: 16px;
+}
+
+body:not(.admin) .solo label {
+    display: grid;
+    gap: 7px;
+    font-weight: 600;
+}
+
+body:not(.admin) .solo input {
+    width: 100%;
+    min-height: 46px;
+    padding: 10px 12px;
+    border: 1px solid #d4d2ca;
+    border-radius: 8px;
+    background: #fff;
+    color: var(--admin-ink);
+    font: inherit;
+}
+
+body:not(.admin) .solo .btn {
+    min-height: 44px;
+    padding: 11px 18px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--admin-dark);
+    color: #fff;
+    font: 600 .95rem "Bricolage Grotesque", system-ui, sans-serif;
+    cursor: pointer;
+}
+
+@media (max-width: 760px) {
+    body.admin .wrap {
+        width: min(100% - 28px, 100%);
+        padding-top: 20px;
     }
 
-    .bar nav{
-        gap:.7rem;
+    body.admin .wrap > .counts {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 11px;
     }
 
-    .bar.scrolled{
-        padding:.45rem .8rem;
-        gap:.45rem;
+    body.admin .wrap > .counts > div {
+        min-height: 108px;
+        padding: 16px;
     }
 
-    .bar.scrolled nav{
-        gap:.55rem;
+    body.admin .bar {
+        padding: 16px 18px;
     }
 
-    .bar.scrolled a{
-        font-size:.9rem;
+    body.admin .bar nav {
+        gap: 7px;
     }
 
-    .bar.scrolled h1{
-        font-size:1.05rem;
+    body.admin .fields {
+        grid-template-columns: minmax(0, 1fr);
     }
 
-    .wrap{
-        padding:1rem;
+    body.admin .fields .wide,
+    body.admin .fields > .full {
+        grid-column: auto;
     }
 
-    .fields{
-        grid-template-columns:1fr;
+    body.admin #testimonial-reviews .counts {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 420px) {
+    body.admin .wrap {
+        width: min(100% - 20px, 100%);
     }
 
-    .fields .wide{
-        grid-column:auto;
+    body.admin .wrap > .counts {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    body.admin .wrap > .counts > div {
+        min-height: 96px;
+        padding: 13px;
+        font-size: .85rem;
+    }
+
+    body.admin .wrap > .counts > div b {
+        font-size: 1.7rem;
+    }
+
+    body.admin .panel {
+        padding: 16px;
+    }
+
+    body.admin .bar nav a,
+    body.admin .bar nav .linklike {
+        min-height: 34px;
+        padding: 6px 9px;
+        font-size: .78rem;
+    }
+
+    body.admin #testimonial-reviews .counts {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        scroll-behavior: auto !important;
+        transition-duration: .01ms !important;
+        animation-duration: .01ms !important;
     }
 }

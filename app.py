@@ -222,9 +222,19 @@ def init_db():
             window_started REAL NOT NULL,
             submissions INTEGER NOT NULL DEFAULT 0
         );
+        CREATE TABLE IF NOT EXISTS testimonial_submission_limits (
+            ip_hash TEXT PRIMARY KEY,
+            window_started REAL NOT NULL,
+            submissions INTEGER NOT NULL DEFAULT 0
+        );
         """)
+        testimonial_cols = {r["name"] for r in c.execute("PRAGMA table_info(testimonials)")}
+        if "status" not in testimonial_cols:
+            c.execute("ALTER TABLE testimonials ADD COLUMN status TEXT NOT NULL DEFAULT 'Approved'")
+        if "created_at" not in testimonial_cols:
+            c.execute("ALTER TABLE testimonials ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
 
-        user_cols = {r["name"] for r in c.execute("PRAGMA table_info(admin_users)")}
+        user_cols = {r["name"] for r in c.execute("PRAGMA table_info(admin_users)") }
 
         if "totp_secret" not in user_cols:
 
@@ -706,6 +716,39 @@ def quote_submission_limited(ip_address):
 
         return row["submissions"] > maximum
 
+
+def testimonial_submission_limited(ip_address):
+    """Allow at most 5 testimonial submissions per IP per 15 minutes."""
+    now = time.time()
+    window_seconds = 15 * 60
+    maximum = 5
+    ip_hash = hmac.new(
+        app.secret_key.encode("utf-8"),
+        (ip_address or "unknown").encode("utf-8"),
+        hashlib.sha256
+    ).hexdigest()
+    with conn() as c:
+        c.execute("""
+            INSERT INTO testimonial_submission_limits(ip_hash, window_started, submissions)
+            VALUES (?, ?, 1)
+            ON CONFLICT(ip_hash) DO UPDATE SET
+                window_started = CASE
+                    WHEN testimonial_submission_limits.window_started <= ?
+                    THEN excluded.window_started
+                    ELSE testimonial_submission_limits.window_started
+                END,
+                submissions = CASE
+                    WHEN testimonial_submission_limits.window_started <= ?
+                    THEN 1
+                    ELSE testimonial_submission_limits.submissions + 1
+                END
+        """, (ip_hash, now, now - window_seconds, now - window_seconds))
+        row = c.execute(
+            "SELECT submissions FROM testimonial_submission_limits WHERE ip_hash=?",
+            (ip_hash,)
+        ).fetchone()
+        return row["submissions"] > maximum
+
 def to_int(v):
 
     try:
@@ -1054,7 +1097,7 @@ def index():
 
         services = c.execute("SELECT * FROM services ORDER BY sort_order,id").fetchall()
 
-        testimonials = c.execute("SELECT * FROM testimonials ORDER BY sort_order,id").fetchall()
+        testimonials = c.execute("SELECT * FROM testimonials WHERE status = 'Approved' ORDER BY sort_order,id").fetchall()
 
         occasions = c.execute("SELECT * FROM occasions WHERE active=1 ORDER BY sort_order,id").fetchall()
 
@@ -1177,6 +1220,52 @@ def submit_quote():
         )
 
     return render_template("quote_received.html")
+
+
+@app.route("/testimonials/submit", methods=["POST"])
+def submit_testimonial():
+    if request.form.get("website"):
+        return redirect(url_for("index") + "#testimonial-form")
+
+    client = request.form.get("client", "").strip()[:100]
+    occasion = request.form.get("occasion", "").strip()[:100]
+    testimonial_text = request.form.get("testimonial", "").strip()[:1500]
+
+    if len(client) < 2 or len(testimonial_text) < 10:
+        return redirect(url_for(
+            "index",
+            testimonial_message="Please enter your name and a testimonial of at least 10 characters."
+        ) + "#testimonial-form")
+
+    if testimonial_submission_limited(request.remote_addr):
+        return redirect(url_for(
+            "index",
+            testimonial_message="Too many submissions. Please try again in 15 minutes."
+        ) + "#testimonial-form")
+
+    with conn() as c:
+        c.execute(
+            """INSERT INTO testimonials(client, quote, role, sort_order, status)
+               VALUES(?, ?, ?, 0, 'Pending')""",
+            (client, testimonial_text, occasion)
+        )
+
+    settings = get_settings()
+    recipient = settings["notify_email"] or settings["email"]
+    send_mail(
+        recipient,
+        f"New client testimonial awaiting approval — {client}",
+        (
+            f"A new testimonial has been submitted for {settings['chef_name']}.\n\n"
+            f"Client: {client}\nOccasion: {occasion or 'Not provided'}\n\n"
+            f"Testimonial:\n{testimonial_text}\n\n"
+            f"Review it in the admin dashboard: {request.url_root}admin#testimonial-reviews"
+        )
+    )
+    return redirect(url_for(
+        "index",
+        testimonial_message="Thank you. Your testimonial has been sent to Chef Melusi for review."
+    ) + "#testimonial-form")
 
 # ---------- owner ----------
 
@@ -1513,6 +1602,15 @@ def admin():
         services = c.execute("SELECT * FROM services ORDER BY sort_order,id").fetchall()
 
         testimonials = c.execute("SELECT * FROM testimonials ORDER BY sort_order,id").fetchall()
+        pending_testimonials = c.execute(
+            "SELECT * FROM testimonials WHERE status = 'Pending' ORDER BY created_at DESC,id DESC"
+        ).fetchall()
+        approved_testimonial_count = c.execute(
+            "SELECT COUNT(*) FROM testimonials WHERE status = 'Approved'"
+        ).fetchone()[0]
+        rejected_testimonial_count = c.execute(
+            "SELECT COUNT(*) FROM testimonials WHERE status = 'Rejected'"
+        ).fetchone()[0]
 
         quotes = c.execute("SELECT * FROM quotes ORDER BY id DESC").fetchall()
 
@@ -1520,11 +1618,11 @@ def admin():
 
     counts = {"photos": len(photos), "services": len(services), "testimonials": len(testimonials),
 
-              "quotes": len(quotes), "new_quotes": sum(1 for q in quotes if q["status"] == "New"), "occasions": len(occasions)}
+              "quotes": len(quotes), "new_quotes": sum(1 for q in quotes if q["status"] == "New"), "occasions": len(occasions), "pending_testimonials": len(pending_testimonials), "approved_testimonials": approved_testimonial_count, "rejected_testimonials": rejected_testimonial_count}
 
     return render_template("admin.html", photos=photos, services=services, testimonials=testimonials,
 
-                           occasions=occasions, quotes=quotes, counts=counts, message=request.args.get("message"),
+                           occasions=occasions, quotes=quotes, counts=counts, pending_testimonials=pending_testimonials, message=request.args.get("message"),
 
                            mail_ready=bool(os.environ.get("SMTP_HOST")))
 
@@ -1715,6 +1813,22 @@ crud("service", "services", ["number", "title", "description", "sort_order"], ["
 crud("testimonial", "testimonials", ["client", "quote", "role", "sort_order"], ["client", "quote"], "Testimonial")
 
 crud("occasion", "occasions", ["name", "sort_order"], ["name"], "Occasion", bools=("active",))
+
+
+@app.route("/admin/testimonial/<int:item_id>/moderate", methods=["POST"])
+@logged_in
+def moderate_testimonial(item_id):
+    status = request.form.get("status", "")
+    if status not in {"Approved", "Rejected", "Pending"}:
+        abort(400)
+    with conn() as c:
+        cur = c.execute(
+            "UPDATE testimonials SET status=? WHERE id=?",
+            (status, item_id)
+        )
+        if cur.rowcount == 0:
+            return redirect(url_for("admin", message="Testimonial not found."))
+    return redirect(url_for("admin", message=f"Testimonial marked {status.lower()}."))
 
 @app.route("/admin/quote/<int:item_id>/status", methods=["POST"])
 
