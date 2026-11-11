@@ -122,9 +122,9 @@ LOCKED_KEYS = set(ASSETS.values())
 
 DEFAULT_SETTINGS = {
 
-    "site_name": "CHEF AMARA", "chef_name": "Chef Amara", "location": "Johannesburg, South Africa",
+    "site_name": "CHEF Melusi", "chef_name": "Chef Melusi", "location": "Johannesburg, South Africa",
 
-    "email": "hello@chefamara.example", "phone": "", "whatsapp": "", "instagram": "", "facebook": "",
+    "email": "hello@chefmelusi.example", "phone": "", "whatsapp": "", "instagram": "", "facebook": "",
 
     "hero_eyebrow": "", "hero_title": "Food made for your table.",
 
@@ -136,7 +136,7 @@ DEFAULT_SETTINGS = {
 
     "about_title": "Cooking with curiosity, not a formula.",
 
-    "about_text": "Chef Amara creates food that feels considered without feeling complicated. Seasonal ingredients, confident technique and a strong sense of place sit at the centre of every menu.",
+    "about_text": "Chef Melusi creates food that feels considered without feeling complicated. Seasonal ingredients, confident technique and a strong sense of place sit at the centre of every menu.",
 
     "about_location": "Based in Johannesburg and available for private bookings and selected events.",
 
@@ -144,9 +144,9 @@ DEFAULT_SETTINGS = {
 
     "quote_text": "Share a few details about your event and the chef will get back to you with a tailored quote.",
 
-    "seo_title": "Chef Amara — Private Chef",
+    "seo_title": "Chef Melusi | Private Chef & Catering in Johannesburg",
 
-    "seo_description": "Private chef experiences, celebrations and events in Johannesburg.",
+    "seo_description": "Experience exceptional private dining and catering with Chef Melusi in Johannesburg. Discover personalised menus for celebrations, special occasions and events.",
 
     "hours": "", "availability": "", "notify_email": "", "show_map": "0",
 
@@ -1781,6 +1781,28 @@ def test_email():
     return redirect(url_for("admin", message=message))
 
 init_db()
+
+# One-time, safe branding/SEO migration:
+# update only values that still match the old Chef Amara defaults.
+# Custom owner-written content is left untouched.
+_LEGACY_BRAND_VALUES = {
+    "site_name": ("CHEF AMARA", "CHEF MELUSI"),
+    "chef_name": ("Chef Amara", "Chef Melusi"),
+    "seo_title": ("Chef Amara — Private Chef", "Chef Melusi | Private Chef & Catering in Johannesburg"),
+    "seo_description": (
+        "Private chef experiences, celebrations and events in Johannesburg.",
+        "Experience exceptional private dining and catering with Chef Melusi in Johannesburg. Discover personalised menus for celebrations, special occasions and events."
+    ),
+    "about_text": (
+        "Chef Amara creates food that feels considered without feeling complicated. Seasonal ingredients, confident technique and a strong sense of place sit at the centre of every menu.",
+        "Chef Melusi creates food that feels considered without feeling complicated. Seasonal ingredients, confident technique and a strong sense of place sit at the centre of every menu."
+    ),
+}
+with conn() as _c:
+    for _key, (_old, _new) in _LEGACY_BRAND_VALUES.items():
+        _row = _c.execute("SELECT value FROM settings WHERE key=?", (_key,)).fetchone()
+        if _row and _row["value"] == _old:
+            _c.execute("UPDATE settings SET value=? WHERE key=?", (_new, _key))
 
 _hours = to_int(os.environ.get("AUTO_BACKUP_HOURS", "24" if PROD else "0"))
 
