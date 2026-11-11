@@ -1098,6 +1098,17 @@ def favicon_svg():
 
     return Response(svg, mimetype="image/svg+xml", headers={"Cache-Control": "public, max-age=3600"})
 
+@app.route("/google0f9a3b5ae4cf7087.html")
+
+def google_site_verification():
+    # Google Search Console ownership verification file.
+    return Response(
+        "google-site-verification: google0f9a3b5ae4cf7087.html",
+        mimetype="text/html",
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
+
+
 @app.route("/robots.txt")
 
 def robots():
