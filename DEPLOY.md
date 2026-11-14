@@ -22,7 +22,7 @@ Generate a secret key: `python -c "import secrets; print(secrets.token_hex(32))"
 
 ## 3. Start command
 
-`gunicorn app:app --workers 1 --threads 4 --bind 0.0.0.0:$PORT` (already in `Procfile`). Keep one worker: SQLite and the login limiter assume a single process.
+`gunicorn app:app --workers 1 --threads 4 --bind 0.0.0.0:$PORT` (already in `Procfile`). SQLite is used for data and persistent login throttling. Keep the database on a persistent disk and use a single worker unless you have tested SQLite write contention under your expected traffic.
 
 ## 4. HTTPS (essential)
 
@@ -51,3 +51,13 @@ Caddy gets and renews the certificate by itself. Then confirm `http://` redirect
 3. Submit the quote form on the live site and confirm the email arrives.
 4. Upload a hero image, a sharing image and a favicon. Paste the site address into WhatsApp to check the preview.
 5. Download a backup and open the zip.
+
+
+## 7. Admin security after this update
+
+- The first owner login after deploying this version requires authenticator setup. Do this on a trusted device and save the one-time recovery codes.
+- Admin login lockouts and audit records are stored in the SQLite database, so the database must be persistent.
+- Admin sessions are cleared after 30 minutes without activity. The Flask permanent-session lifetime is 8 hours.
+- Visit `/admin/security` after login to review the latest admin activity and regenerate recovery codes.
+- Keep `SECRET_KEY` stable across deploys. Changing it invalidates existing sessions.
+- Use HTTPS in production. Do not expose the development Flask server or enable `debug=True` on a public host.
