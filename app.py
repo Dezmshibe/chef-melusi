@@ -15,8 +15,8 @@ Environment variables (see .env.example):
   FORCE_HTTPS=1, TRUST_PROXY=1, AUTO_BACKUP_HOURS=24, DEFAULT_COUNTRY_CODE=27
 
 """
-
-import io, os, re, json, time, shutil, zipfile, sqlite3, secrets, smtplib, tempfile, threading, logging, hmac, hashlib, base64, struct
+import io, os, re, json, time, shutil, zipfile, sqlite3, secrets, tempfile, threading, logging, hmac, hashlib, base64, struct
+import requests
 
 from pathlib import Path
 
@@ -966,6 +966,69 @@ def _send_mail_now(to, subject, body, reply_to=None):
         log.exception("Email failed: %s", subject)
 
         return False
+    
+def _send_mail_now(to, subject, body, reply_to=None):
+    """Send an email through the Resend API."""
+
+    api_key = os.environ.get("RESEND_API_KEY")
+    mail_from = os.environ.get("MAIL_FROM")
+
+    if not api_key or not mail_from or not to:
+        log.error("Resend email not sent: missing API key, sender or recipient.")
+        return False
+
+    payload = {
+        "from": mail_from,
+        "to": [to],
+        "subject": subject,
+        "text": body,
+    }
+
+    if reply_to:
+        payload["reply_to"] = reply_to
+
+    try:
+        response = requests.post(
+            "https://api.resend.com/emails",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            json=payload,
+            timeout=20,
+        )
+
+        if response.status_code not in (200, 201):
+            log.error(
+                "Resend rejected email. Status: %s Response: %s",
+                response.status_code,
+                response.text[:1000],
+            )
+            return False
+
+        log.info("Email successfully accepted by Resend.")
+        return True
+
+    except requests.RequestException:
+        log.exception("Resend email delivery request failed.")
+        return False
+
+
+def send_mail(to, subject, body, reply_to=None):
+    """Queue an email without blocking the quote form."""
+
+    if not os.environ.get("RESEND_API_KEY") or not os.environ.get("MAIL_FROM") or not to:
+        log.error("Resend email not queued: configuration or recipient missing.")
+        return False
+
+    threading.Thread(
+        target=_send_mail_now,
+        args=(to, subject, body),
+        kwargs={"reply_to": reply_to},
+        daemon=True,
+    ).start()
+
+    return True
 
 def send_mail(to, subject, body, reply_to=None):
 
@@ -1620,11 +1683,21 @@ def admin():
 
               "quotes": len(quotes), "new_quotes": sum(1 for q in quotes if q["status"] == "New"), "occasions": len(occasions), "pending_testimonials": len(pending_testimonials), "approved_testimonials": approved_testimonial_count, "rejected_testimonials": rejected_testimonial_count}
 
-    return render_template("admin.html", photos=photos, services=services, testimonials=testimonials,
-
-                           occasions=occasions, quotes=quotes, counts=counts, pending_testimonials=pending_testimonials, message=request.args.get("message"),
-
-                           mail_ready=bool(os.environ.get("SMTP_HOST")))
+    return render_template(
+        "admin.html",
+        photos=photos,
+        services=services,
+        testimonials=testimonials,
+        occasions=occasions,
+        quotes=quotes,
+        counts=counts,
+        pending_testimonials=pending_testimonials,
+        message=request.args.get("message"),
+        mail_ready=bool(
+            os.environ.get("RESEND_API_KEY")
+            and os.environ.get("MAIL_FROM")
+        ),
+    )
 
 @app.route("/admin/settings", methods=["POST"])
 
