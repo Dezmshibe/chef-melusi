@@ -913,68 +913,25 @@ def wa_number(v):
 
     return cc + d[1:] if d.startswith("0") else d
 
-def _send_mail_now(to, subject, body, reply_to=None):
 
-    """Send one message and report the SMTP server's actual result."""
+# ---------- email (Resend API) ----------
 
-    host = os.environ.get("SMTP_HOST")
-
-    if not host or not to:
-
-        log.warning("Email not sent (SMTP_HOST or recipient missing): %s", subject)
-
-        return False
-
-    try:
-
-        port = int(os.environ.get("SMTP_PORT", "587"))
-
-        user, pw = os.environ.get("SMTP_USER"), os.environ.get("SMTP_PASSWORD")
-
-        message = EmailMessage()
-
-        message["Subject"] = re.sub(r"[**\**&#x72;**\**&#x6E;]+", " ", subject)
-
-        message["From"] = os.environ.get("MAIL_FROM") or user or "no-reply@localhost"
-
-        message["To"] = to
-
-        if reply_to:
-
-            message["Reply-To"] = reply_to
-
-        message.set_content(body)
-
-        smtp = smtplib.SMTP_SSL(host, port, timeout=20) if port == 465 else smtplib.SMTP(host, port, timeout=20)
-
-        with smtp:
-
-            if port != 465:
-
-                smtp.starttls()
-
-            if user:
-
-                smtp.login(user, pw or "")
-
-            smtp.send_message(message)
-
-        return True
-
-    except Exception:
-
-        log.exception("Email failed: %s", subject)
-
-        return False
-    
 def _send_mail_now(to, subject, body, reply_to=None):
     """Send an email through the Resend API."""
 
     api_key = os.environ.get("RESEND_API_KEY")
     mail_from = os.environ.get("MAIL_FROM")
 
-    if not api_key or not mail_from or not to:
-        log.error("Resend email not sent: missing API key, sender or recipient.")
+    if not api_key:
+        log.error("Email failed: RESEND_API_KEY is missing.")
+        return False
+
+    if not mail_from:
+        log.error("Email failed: MAIL_FROM is missing.")
+        return False
+
+    if not to:
+        log.error("Email failed: recipient is missing.")
         return False
 
     payload = {
@@ -1010,49 +967,48 @@ def _send_mail_now(to, subject, body, reply_to=None):
         return True
 
     except requests.RequestException:
-        log.exception("Resend email delivery request failed.")
+        log.exception("Resend email request failed.")
+        return False
+
+    except Exception:
+        log.exception("Unexpected email error.")
         return False
 
 
 def send_mail(to, subject, body, reply_to=None):
-    """Queue an email without blocking the quote form."""
+    """Queue an email in a background thread."""
 
-    if not os.environ.get("RESEND_API_KEY") or not os.environ.get("MAIL_FROM") or not to:
-        log.error("Resend email not queued: configuration or recipient missing.")
+    if not to:
+        log.error("Email not queued: recipient is missing.")
         return False
 
-    threading.Thread(
-        target=_send_mail_now,
-        args=(to, subject, body),
-        kwargs={"reply_to": reply_to},
-        daemon=True,
-    ).start()
-
-    return True
-
-def send_mail(to, subject, body, reply_to=None):
-
-    """Queue a notification email without blocking the public quote form."""
-
-    if not os.environ.get("SMTP_HOST") or not to:
-
-        log.warning("Email not queued (SMTP_HOST or recipient missing): %s", subject)
-
+    if not os.environ.get("RESEND_API_KEY"):
+        log.error("Email not queued: RESEND_API_KEY is missing.")
         return False
 
-    threading.Thread(
+    if not os.environ.get("MAIL_FROM"):
+        log.error("Email not queued: MAIL_FROM is missing.")
+        return False
 
-        target=_send_mail_now,
+    try:
+        email_thread = threading.Thread(
+            target=_send_mail_now,
+            args=(to, subject, body),
+            kwargs={"reply_to": reply_to},
+            daemon=True,
+        )
 
-        args=(to, subject, body),
+        email_thread.start()
+        log.info("Email queued: %s", subject)
+        return True
 
-        kwargs={"reply_to": reply_to},
+    except Exception:
+        log.exception("Could not queue email.")
+        return False
 
-        daemon=True,
 
-    ).start()
+# ---------- end email ----------
 
-    return True
 
 def build_backup(fileobj):
 
@@ -1651,7 +1607,43 @@ def regenerate_recovery_codes():
     audit_event("recovery_codes_regenerated", g.user["id"], "One-time recovery codes regenerated")
 
     return render_template("two_factor_recovery.html", recovery_codes=recovery_codes)
+@app.route("/admin/security/reset-2fa", methods=["POST"])
+@logged_in
+def reset_two_factor():
+    current_password = request.form.get("current_password", "")
 
+    if not check_password_hash(g.user["password_hash"], current_password):
+        return redirect(url_for(
+            "security_audit",
+            error="Incorrect password. Your authenticator was not reset."
+        ))
+
+    admin_id = g.user["id"]
+
+    with conn() as c:
+        c.execute(
+            """
+            UPDATE admin_users
+            SET totp_secret=NULL, totp_enabled=0
+            WHERE id=?
+            """,
+            (admin_id,)
+        )
+
+        c.execute(
+            "DELETE FROM admin_recovery_codes WHERE admin_id=?",
+            (admin_id,)
+        )
+
+    session.pop("pending_totp_secret", None)
+
+    audit_event(
+        "two_factor_reset",
+        admin_id,
+        "Authenticator reset by administrator."
+    )
+
+    return redirect(url_for("two_factor_setup"))
 @app.route("/admin")
 
 @logged_in
@@ -1944,29 +1936,45 @@ def backup():
     return send_file(buf, mimetype="application/zip", as_attachment=True, download_name=f"chef-backup-{datetime.utcnow():%Y-%m-%d}.zip")
 
 @app.route("/admin/test-email", methods=["POST"])
-
 @logged_in
-
 def test_email():
-
     s = get_settings()
 
-    to = s["notify_email"] or s["email"]
+    # The admin's preferred quote notification address
+    to = (s.get("notify_email") or s.get("email") or "").strip()
 
-    ok = _send_mail_now(to, "Test email from your website", "Email notifications are working.")
+    if not to:
+        return redirect(url_for(
+            "admin",
+            message="Test email failed: Set a quote notification email in Website Settings first."
+        ))
 
-    message = (
-
-        f"Your SMTP server accepted the test email for {to}. Check your inbox (and spam)."
-
-        if ok else
-
-        "The test email could not be sent. Check the SMTP host, port, username, password and recipient in your hosting settings."
-
+    ok = _send_mail_now(
+        to,
+        "Test email from Chef Melusi's website",
+        (
+            "Hello,\n\n"
+            "This is a test email from Chef Melusi's website.\n\n"
+            "Your Resend email integration is working if you received this message.\n\n"
+            "Future quote requests will be sent to this email address.\n\n"
+            "Regards,\n"
+            "Chef Melusi Website"
+        )
     )
 
-    return redirect(url_for("admin", message=message))
+    if ok:
+        message = (
+            f"Resend accepted the test email for {to}. "
+            "Please check your inbox and spam folder."
+        )
+    else:
+        message = (
+            "Test email failed. Check your RESEND_API_KEY, "
+            "MAIL_FROM sender address and verified Resend domain. "
+            "Check your Render application logs for the exact error."
+        )
 
+    return redirect(url_for("admin", message=message))
 init_db()
 
 # One-time, safe branding/SEO migration:
